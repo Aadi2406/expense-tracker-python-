@@ -1,0 +1,119 @@
+import mysql.connector
+from datetime import date
+
+# -------------------- DATABASE CONNECTION --------------------
+def create_connection():
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",          # change to your MySQL username
+            password="yourpassword"  #change to your MySQL password
+        )
+        cursor = conn.cursor()
+        cursor.execute("CREATE DATABASE IF NOT EXISTS expense_tracker")
+        conn.database = "expense_tracker"
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                date DATE NOT NULL,
+                category VARCHAR(50),
+                amount DECIMAL(10,2),
+                description TEXT
+            )
+        """)
+        conn.commit()
+        return conn, cursor
+    except mysql.connector.Error as err:
+        print(f"❌ Database connection failed: {err}")
+        exit()
+
+# -------------------- CRUD FUNCTIONS --------------------
+def add_expense(cursor, conn):
+    d = input("Enter date (YYYY-MM-DD) or press Enter for today: ")
+    d = d if d else str(date.today())
+    category = input("Enter category: ")
+    amount = float(input("Enter amount: "))
+    description = input("Enter description: ")
+    cursor.execute(
+        "INSERT INTO expenses (date, category, amount, description) VALUES (%s, %s, %s, %s)",
+        (d, category, amount, description)
+    )
+    conn.commit()
+    print("✅ Expense added successfully!")
+
+def view_expenses(cursor):
+    cursor.execute("SELECT * FROM expenses ORDER BY date DESC")
+    rows = cursor.fetchall()
+    print("\n--- All Expenses ---")
+    if not rows:
+        print("No expenses recorded yet.")
+        return
+    for row in rows:
+        print(f"ID: {row[0]} | Date: {row[1]} | Category: {row[2]} | Amount: ₹{row[3]} | Note: {row[4]}")
+
+def update_expense(cursor, conn):
+    id = input("Enter expense ID to update: ")
+    cursor.execute("SELECT * FROM expenses WHERE id = %s", (id,))
+    if not cursor.fetchone():
+        print("❌ Expense ID not found!")
+        return
+    amount = float(input("Enter new amount: "))
+    cursor.execute("UPDATE expenses SET amount = %s WHERE id = %s", (amount, id))
+    conn.commit()
+    print("✅ Expense updated successfully!")
+
+def delete_expense(cursor, conn):
+    id = input("Enter expense ID to delete: ")
+    cursor.execute("SELECT * FROM expenses WHERE id = %s", (id,))
+    if not cursor.fetchone():
+        print("❌ Expense ID not found!")
+        return
+    cursor.execute("DELETE FROM expenses WHERE id = %s", (id,))
+    conn.commit()
+    print("🗑️ Expense deleted successfully!")
+
+def summary(cursor):
+    cursor.execute("SELECT category, SUM(amount) FROM expenses GROUP BY category")
+    rows = cursor.fetchall()
+    print("\n--- Expense Summary by Category ---")
+    if not rows:
+        print("No expenses to summarize.")
+        return
+    for row in rows:
+        print(f"{row[0]}: ₹{row[1]}")
+
+# -------------------- MAIN MENU --------------------
+def menu():
+    conn, cursor = create_connection()
+    while True:
+        print("\n===== Expense Tracker Menu =====")
+        print("1. Add Expense")
+        print("2. View Expenses")
+        print("3. Update Expense")
+        print("4. Delete Expense")
+        print("5. Expense Summary")
+        print("6. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            add_expense(cursor, conn)
+        elif choice == '2':
+            view_expenses(cursor)
+        elif choice == '3':
+            update_expense(cursor, conn)
+        elif choice == '4':
+            delete_expense(cursor, conn)
+        elif choice == '5':
+            summary(cursor)
+        elif choice == '6':
+            print("👋 Exiting Expense Tracker. Goodbye!")
+            break
+        else:
+            print("❌ Invalid choice. Try again.")
+
+    cursor.close()
+    conn.close()
+
+# -------------------- RUN PROGRAM --------------------
+if __name__ == "__main__":
+    menu()
